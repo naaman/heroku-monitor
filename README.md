@@ -21,5 +21,3 @@ $ heroku monitor --ps web
 ## Known Issues
 * Escape sequences aren't quite right. If there's more output than the screen
 can handle and you scroll in the terminal, output gets mangled.
-* Only handles `measure=<name> val=<val>` [l2met](https://github.com/ryandotsmith/l2met)
-format so far.
