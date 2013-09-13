@@ -51,16 +51,18 @@ class Heroku::Command::Monitor < Heroku::Command::BaseWithApp
   end
   
   def merge_data_from_line(line, data)
-    parsed = parse(line)
+    parsed_array = parse(line)
     
-    unless parsed.nil?
-      if data[parsed.process].nil? then
-        data[parsed.process] = {parsed.data.name => [parsed.data.value]}
-      elsif data[parsed.process][parsed.data.name].nil?
-        data[parsed.process][parsed.data.name] = [parsed.data.value]
-      else
-        data[parsed.process][parsed.data.name] << parsed.data.value
-      end
+    unless parsed_array.nil?
+      parsed_array.each { |parsed|
+        if data[parsed.process].nil? then
+          data[parsed.process] = {parsed.data.name => [parsed.data.value]}
+        elsif data[parsed.process][parsed.data.name].nil?
+          data[parsed.process][parsed.data.name] = [parsed.data.value]
+        else
+          data[parsed.process][parsed.data.name] << parsed.data.value
+        end
+      }
     end
   end
   
@@ -82,20 +84,11 @@ class Heroku::Command::Monitor < Heroku::Command::BaseWithApp
     return if line_parts.nil? || line_parts.length < 5
 
     process_name = line_parts[3]
-    measures = key_value_split(line_parts[4])
-                 .select{|v| !v.empty?}
-                 .inject({}, &to_key_value)
-                 .select{|k,v| k =~ /measure|val|units/}
-    return if measures.empty? || measures.size < 2
-
-    ProcessData.new(
-      process_name, 
-      DataPoint.new(
-        measures["measure"], 
-        measures["val"], 
-        measures["units"]
-      )
-    )
+    key_value_split(line_parts[4])
+      .select{|v| !v.empty?}
+      .inject({}, &to_key_value)
+      .select{|k,v| k =~ /measure|sample|count/}
+      .map(&to_process_data(process_name))
   end
 
   def to_key_value
@@ -103,6 +96,17 @@ class Heroku::Command::Monitor < Heroku::Command::BaseWithApp
       kv = v.split("=", 2)
       r[kv.first] = kv.last if kv.size == 2
       r
+    }
+  end
+
+  def to_process_data(process_name)
+    lambda { |v|
+      return unless v.size == 2
+      val_with_unit = v[1].match /([\d\.]+)(.*)/
+      ProcessData.new(
+        process_name,
+        DataPoint.new(v[0], val_with_unit[1], val_with_unit[2])
+      )
     }
   end
 
